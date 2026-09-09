@@ -57,6 +57,26 @@ def calculate_scores(df, scenario_id):
 #---------------------------------------------------
 st.set_page_config(page_title="Küresel Risk Simülatörü", layout="wide")
 
+# Real typography beyond what config.toml's theme.font (sans serif/serif/
+# monospace only) can express - a serif display face for headings (analyst-
+# report register, not a generic dashboard sans) and a monospace face for
+# the scenario explainer/labels, both real Google Fonts loaded via CDN link.
+st.markdown(
+    """
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      h1, h2, h3 { font-family: 'Newsreader', Georgia, serif !important; letter-spacing: -0.01em; }
+      h1 { font-weight: 600 !important; }
+      div[data-testid="stExpander"] summary, div[data-testid="stExpander"] p,
+      .stSelectbox label p { font-family: 'IBM Plex Mono', ui-monospace, monospace !important; font-size: 0.92rem; }
+      div[data-testid="stMarkdownContainer"] > p { color: #b8b3a8; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("🌍 Dinamik Küresel Risk Simülatörü")
 st.markdown("""
 Bu araç, farklı küresel kriz senaryolarına göre ülkelerin dayanıklılığını analiz eder. 

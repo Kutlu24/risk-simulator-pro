@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: risk-simulator-pro
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # Streamlit's own dev server binds 0.0.0.0/8501 by default - Render
+    # assigns a dynamic $PORT and expects the service to bind that exact
+    # port, so all three flags below are required (not just --server.port):
+    # --server.address so it listens on all interfaces (Render's proxy
+    # doesn't reach 127.0.0.1), --server.headless so it doesn't try to open
+    # a local browser (would hang the process on Render), --browser.gatherUsageStats
+    # false to skip Streamlit's telemetry prompt (would otherwise block on
+    # a stdin read that never comes on Render's non-interactive shell).
+    startCommand: streamlit run risk_simulator_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
