@@ -5,8 +5,13 @@ Created on Fri Jul  4 00:33:05 2025
 @author: kutlu
 """
 
-import streamlit as st
+import json
+from pathlib import Path
+
+import folium
 import pandas as pd
+import streamlit as st
+from streamlit_folium import st_folium
 
 # 1. CORE DATA AND SETTINGS
 #---------------------------------------------------
@@ -26,6 +31,19 @@ data = {
     'Demographic Resilience': [8, 7, 6, 7, 8, 8, 7, 9, 9, 5, 4, 7, 8, 6, 2, 2, 3, 3, 9]
 }
 df = pd.DataFrame(data)
+
+# ISO-3166-1 alpha-3 codes for the 19 countries above - needed to join scores
+# onto the world-boundaries GeoJSON for the choropleth map (its features are
+# keyed by this code, not by country name, since names alone are ambiguous
+# across sources, e.g. "Russia" vs "Russian Federation").
+COUNTRY_ISO3 = {
+    'New Zealand': 'NZL', 'Iceland': 'ISL', 'Switzerland': 'CHE', 'Uruguay': 'URY',
+    'Ireland': 'IRL', 'Costa Rica': 'CRI', 'Chile': 'CHL', 'Australia': 'AUS',
+    'Canada': 'CAN', 'Finland': 'FIN', 'Portugal': 'PRT', 'Malaysia': 'MYS',
+    'Botswana': 'BWA', 'Argentina': 'ARG', 'Japan': 'JPN', 'Italy': 'ITA',
+    'China': 'CHN', 'Russia': 'RUS', 'India': 'IND',
+}
+WORLD_COUNTRIES_GEOJSON = Path(__file__).parent / "data" / "world-countries.json"
 
 scenario_weights = {
     '1': {'name': 'General Balanced Crisis', 'weights': {'Geographic Isolation': 0.15, 'Nuclear Risk': 0.15, 'Political Neutrality': 0.10, 'Economic Resilience': 0.10, 'Domestic Social Stability': 0.10, 'Infrastructure & Health': 0.10, 'Public Preparedness': 0.05, 'Climate Resilience': 0.05, 'Energy Independence': 0.05, 'Cybersecurity': 0.05, 'Demographic Resilience': 0.05}},
@@ -91,7 +109,66 @@ def tier_for_rank(rank: int, n: int) -> tuple[str, str, str]:
 #---------------------------------------------------
 
 
-# 3. STREAMLIT UI
+# 3. GEOGRAPHIC VIEW (choropleth map)
+#---------------------------------------------------
+def build_resilience_map(result_df: pd.DataFrame) -> folium.Map:
+    """A world choropleth colored by resilience score, alongside the
+    existing table/bar chart - a ranking like this is inherently
+    geographic, and regional patterns (e.g. "isolated/southern-hemisphere
+    countries cluster high in this scenario") are easy to miss in a bar
+    chart but jump out on a map. RdYlGn (red-yellow-green) mirrors the
+    tier badges above (Vulnerable=red, Moderate=amber, Resilient=green)
+    rather than an arbitrary palette. Countries outside our 19 simply have
+    no score and render in the map's neutral no-data color - that gap is
+    itself informative (this tool doesn't claim global coverage).
+    """
+    geo_df = result_df[['Country', 'Weighted Score']].copy()
+    geo_df['ISO3'] = geo_df['Country'].map(COUNTRY_ISO3)
+    unmapped = geo_df[geo_df['ISO3'].isna()]
+    if not unmapped.empty:
+        # Fail loudly rather than silently drop a country from the map -
+        # a missing ISO3 entry here means COUNTRY_ISO3 wasn't updated
+        # alongside `data` above.
+        raise ValueError(
+            f"No ISO3 code mapped for: {', '.join(unmapped['Country'])} - "
+            "add it to COUNTRY_ISO3."
+        )
+
+    # Plain OpenStreetMap tiles, not a CartoDB dark variant: folium's dark
+    # CartoDB tiles now require a registered API key we don't have (as of
+    # folium 0.20) - OpenStreetMap needs no key and is guaranteed to render.
+    m = folium.Map(location=[15, 10], zoom_start=2, tiles="OpenStreetMap")
+    folium.Choropleth(
+        geo_data=str(WORLD_COUNTRIES_GEOJSON),
+        data=geo_df,
+        columns=['ISO3', 'Weighted Score'],
+        key_on='feature.id',
+        fill_color='RdYlGn',
+        nan_fill_color='#2a2f38',  # matches the app's dark theme, not folium's default white
+        fill_opacity=0.85,
+        line_opacity=0.3,
+        legend_name='Weighted Resilience Score',
+    ).add_to(m)
+
+    # Country-name + score tooltip on hover - the choropleth's color alone
+    # doesn't tell you the exact number or which country you're looking at.
+    country_lookup = geo_df.set_index('ISO3')[['Country', 'Weighted Score']].to_dict('index')
+    with open(WORLD_COUNTRIES_GEOJSON, encoding='utf-8') as f:
+        world_geojson = json.load(f)
+    scored_features = [feat for feat in world_geojson['features'] if feat['id'] in country_lookup]
+    for feat in scored_features:
+        info = country_lookup[feat['id']]
+        feat['properties']['tooltip'] = f"{info['Country']}: {info['Weighted Score']:.2f}"
+    folium.GeoJson(
+        {'type': 'FeatureCollection', 'features': scored_features},
+        style_function=lambda _: {'fillOpacity': 0, 'weight': 0},
+        tooltip=folium.GeoJsonTooltip(fields=['tooltip'], aliases=[''], labels=False),
+    ).add_to(m)
+    return m
+#---------------------------------------------------
+
+
+# 4. STREAMLIT UI
 #---------------------------------------------------
 st.set_page_config(page_title="Global Risk Simulator", layout="wide")
 
@@ -186,4 +263,10 @@ with col2:
         elif selected_id == '6':
             text = "Diversified, innovative, high-tech economies not dependent on fossil fuels come out ahead in this revolution. A young, educated population is a major advantage."
         st.markdown(f"<span class='risk-icon'>{icon}</span>{text}", unsafe_allow_html=True)
+
+# Full-width, below the table/chart columns rather than squeezed into
+# col1/col2 - a world map needs real horizontal room to be readable.
+st.subheader("🗺️ Geographic View")
+st.caption("Same scores as the table/chart above, mapped by country - regional patterns are easy to miss in a bar chart but obvious on a map.")
+st_folium(build_resilience_map(result_df), width=None, height=420, returned_objects=[])
 #---------------------------------------------------
