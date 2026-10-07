@@ -159,6 +159,20 @@ def build_resilience_map(result_df: pd.DataFrame) -> folium.Map:
     for feat in scored_features:
         info = country_lookup[feat['id']]
         feat['properties']['tooltip'] = f"{info['Country']}: {info['Weighted Score']:.2f}"
+    # Narrow screens (phones): the 450px-wide colour legend would run off the
+    # left edge and sit on top of the zoom buttons, and zoom 2 centred on
+    # Europe/Africa hides most scored countries (Australia, NZ, S. America...).
+    # So below ~520px the legend shrinks, the zoom control moves to the bottom
+    # and the map opens on the whole world. Desktop is unchanged.
+    m.get_root().header.add_child(folium.Element(
+        "<style>@media (max-width: 520px) {"
+        " .legend.leaflet-control { transform: scale(0.62); transform-origin: top right; margin: 4px 0 0 0 !important; }"
+        " .leaflet-top.leaflet-left { top: auto; bottom: 26px; }"
+        "}</style>"
+    ))
+    m.get_root().script.add_child(folium.Element(
+        f"if ({m.get_name()}.getSize().x < 520) {{ {m.get_name()}.setView([15, 10], 0); }}"
+    ))
     folium.GeoJson(
         {'type': 'FeatureCollection', 'features': scored_features},
         style_function=lambda _: {'fillOpacity': 0, 'weight': 0},
