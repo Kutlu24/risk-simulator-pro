@@ -193,6 +193,33 @@ st.markdown(
       table.risk-table th { text-align: left; padding: 8px 10px; color: #8b8578; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #2a2f38; }
       table.risk-table td { padding: 7px 10px; border-bottom: 1px solid #1c2027; color: #e8e6e1; }
       .tier-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.78rem; font-weight: 500; }
+
+      /* Scenario picker: the one control that drives the whole page, so it gets
+         its own accent panel, a step label + title, and an oversized select.
+         Targeted through widget keys (st-key-*), which are stable across
+         Streamlit's internal markup changes (BaseWeb select -> React Aria). */
+      .st-key-scenario_picker {
+        border: 1px solid rgba(201,120,47,0.55) !important;
+        border-left: 5px solid #c9782f !important;
+        border-radius: 16px !important;
+        background: linear-gradient(135deg, rgba(201,120,47,0.20), rgba(201,120,47,0.05) 60%) !important;
+        padding: 1rem 1.2rem 0.9rem !important;
+        margin: 0.4rem 0 1.4rem;
+        box-shadow: 0 10px 34px rgba(201,120,47,0.14);
+      }
+      .sp-step { font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 0.74rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: #e59a56; }
+      .sp-title { font-family: 'Petrona', Georgia, serif; font-size: clamp(1.45rem, 3.4vw, 2.1rem); font-weight: 700; line-height: 1.12; color: #f4f1ea; margin: 0.15rem 0 0.2rem; }
+      .sp-hint { color: #b8b3a8; font-size: 0.9rem; margin-bottom: 0.4rem; }
+      .st-key-scenario_select [role="group"],
+      .st-key-scenario_select [data-baseweb="select"] > div {
+        min-height: 3.5rem !important; height: auto !important;
+        background: #10141a !important; border: 2px solid #c9782f !important; border-radius: 12px !important;
+        transition: box-shadow .2s ease, border-color .2s ease;
+      }
+      .st-key-scenario_select input, .st-key-scenario_select [data-baseweb="select"] div { font-size: 1.15rem !important; font-weight: 600 !important; color: #fff !important; }
+      .st-key-scenario_select [role="group"]:hover, .st-key-scenario_select [role="group"]:focus-within,
+      .st-key-scenario_select [data-baseweb="select"] > div:hover { border-color: #f0a35e !important; box-shadow: 0 0 0 4px rgba(201,120,47,0.28); }
+      .st-key-scenario_select svg { color: #e59a56; width: 1.6rem !important; height: 1.6rem !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -204,12 +231,26 @@ This tool analyzes how resilient countries are under different global crisis sce
 Each scenario assigns different weights to different factors (economy, geography, energy, etc.), dynamically changing the country ranking.
 """)
 
-# Dropdown menu (selectbox) for scenario selection
+# Scenario selection - the control that drives everything below, so it is a
+# prominent accent panel (see the .sp-* / stSelectbox CSS above) rather than a
+# bare dropdown. The visible heading is HTML; the selectbox keeps a real,
+# collapsed label so screen readers still announce what it is.
 scenario_name_to_id = {v['name']: k for k, v in scenario_weights.items()}
-selected_scenario_name = st.selectbox(
-    'Please select the scenario you want to analyze:',
-    list(scenario_name_to_id.keys())
-)
+with st.container(border=True, key="scenario_picker"):
+    st.markdown(
+        f"""
+        <div class="sp-step">Step 1 · Choose a crisis</div>
+        <div class="sp-title">Which scenario do you want to analyze?</div>
+        <div class="sp-hint">{len(scenario_name_to_id)} scenarios - each one re-weights the criteria and re-ranks every country below.</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    selected_scenario_name = st.selectbox(
+        'Select the scenario you want to analyze',
+        list(scenario_name_to_id.keys()),
+        label_visibility="collapsed",
+        key="scenario_select",
+    )
 
 # Run the calculation for the selected scenario
 selected_id = scenario_name_to_id[selected_scenario_name]
