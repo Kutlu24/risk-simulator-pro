@@ -6,6 +6,7 @@ Created on Fri Jul  4 00:33:05 2025
 """
 
 import json
+import re
 from pathlib import Path
 
 import folium
@@ -111,7 +112,23 @@ def tier_for_rank(rank: int, n: int) -> tuple[str, str, str]:
 
 # 3. GEOGRAPHIC VIEW (choropleth map)
 #---------------------------------------------------
-def build_resilience_map(result_df: pd.DataFrame) -> folium.Map:
+def _is_mobile() -> bool:
+    """True for phones (User-Agent), or when the URL carries ?mobile=1.
+
+    st_folium builds the map itself and ignores scripts injected into the folium
+    root, so the phone view cannot be applied from the browser side; it has to be
+    chosen here, before the map is drawn. Narrow desktop windows still get the CSS
+    treatment above (shrunk legend, bottom zoom control, shorter frame).
+    """
+    try:
+        user_agent = st.context.headers.get("User-Agent", "") or ""
+    except Exception:
+        user_agent = ""
+    forced = str(st.query_params.get("mobile", "")).lower() in ("1", "true")
+    return forced or bool(re.search(r"Mobi|Android|iPhone|iPod", user_agent))
+
+
+def build_resilience_map(result_df: pd.DataFrame, mobile: bool = False) -> folium.Map:
     """A world choropleth colored by resilience score, alongside the
     existing table/bar chart - a ranking like this is inherently
     geographic, and regional patterns (e.g. "isolated/southern-hemisphere
@@ -137,7 +154,13 @@ def build_resilience_map(result_df: pd.DataFrame) -> folium.Map:
     # Plain OpenStreetMap tiles, not a CartoDB dark variant: folium's dark
     # CartoDB tiles now require a registered API key we don't have (as of
     # folium 0.20) - OpenStreetMap needs no key and is guaranteed to render.
-    m = folium.Map(location=[15, 10], zoom_start=2, tiles="OpenStreetMap")
+    # Phones open on the whole world (zoom 0 fits a ~300px-wide frame); st_folium
+    # takes its opening view from here, not from its own center/zoom arguments.
+    m = folium.Map(
+        location=[8, 10] if mobile else [15, 10],
+        zoom_start=0 if mobile else 2,
+        tiles="OpenStreetMap",
+    )
     folium.Choropleth(
         geo_data=str(WORLD_COUNTRIES_GEOJSON),
         data=geo_df,
@@ -169,10 +192,6 @@ def build_resilience_map(result_df: pd.DataFrame) -> folium.Map:
         " .legend.leaflet-control { transform: scale(0.62); transform-origin: top right; margin: 4px 0 0 0 !important; }"
         " .leaflet-top.leaflet-left { top: auto; bottom: 26px; }"
         "}</style>"
-    ))
-    m.get_root().script.add_child(folium.Element(
-        f"(function(){{ var m = {m.get_name()}; function fit(){{ if (m.getSize().x < 520) {{ m.setView([8, 10], 0); }} }}"
-        f" fit(); setTimeout(fit, 300); setTimeout(fit, 1200); }})();"
     ))
     folium.GeoJson(
         {'type': 'FeatureCollection', 'features': scored_features},
@@ -317,5 +336,13 @@ with col2:
 # col1/col2 - a world map needs real horizontal room to be readable.
 st.subheader("🗺️ Geographic View")
 st.caption("Same scores as the table/chart above, mapped by country - regional patterns are easy to miss in a bar chart but obvious on a map.")
-st_folium(build_resilience_map(result_df), width=None, height=420, returned_objects=[])
+# Phones open on the whole world (zoom 0 fits a ~300px-wide frame) in a frame as
+# tall as that world; everywhere else the original zoom-2 view in a 420px frame.
+_mobile = _is_mobile()
+st_folium(
+    build_resilience_map(result_df, mobile=_mobile),
+    width=None,
+    height=285 if _mobile else 420,
+    returned_objects=[],
+)
 #---------------------------------------------------
