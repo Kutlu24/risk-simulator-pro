@@ -206,6 +206,30 @@ def build_resilience_map(result_df: pd.DataFrame, mobile: bool = False) -> foliu
 #---------------------------------------------------
 st.set_page_config(page_title="Global Risk Simulator", layout="wide")
 
+# Cross-links to the sibling sites in the Global Monitor network. All
+# overridable by env so a staging deployment can point elsewhere.
+import os
+
+_NETWORK = {
+    "hub": os.environ.get("RS_HUB_URL", "https://global-monitor-render-relay.onrender.com/hub/"),
+    "gm": os.environ.get("RS_GM_URL", "https://global-monitor-render-relay.onrender.com/"),
+    "tension": os.environ.get("RS_TENSION_URL", "https://global-monitor-render-relay.onrender.com/tension/"),
+    "risk": os.environ.get("RS_RISK_URL", "https://global-monitor-render-relay.onrender.com/risk/"),
+    "worldora": os.environ.get("RS_WORLDORA_URL", "https://kutlu24.github.io/worldora/"),
+    "intel": os.environ.get("RS_INTEL_URL", "https://gfca.onrender.com/ui/intel.html"),
+}
+
+with st.sidebar:
+    st.markdown("### Network")
+    st.markdown(
+        f"[Geo Analysis Hub]({_NETWORK['hub']})  \n"
+        f"[Global Monitor]({_NETWORK['gm']})  \n"
+        f"[Current Tension]({_NETWORK['tension']})  \n"
+        f"[Risk Simulator overview]({_NETWORK['risk']})  \n"
+        f"[Worldora news]({_NETWORK['worldora']})  \n"
+        f"[Worldora Intelligence]({_NETWORK['intel']})"
+    )
+
 # Real typography beyond what config.toml's theme.font (sans serif/serif/
 # monospace only) can express - a serif display face for headings (analyst-
 # report register), a technical sans for body copy, and a monospace face for
