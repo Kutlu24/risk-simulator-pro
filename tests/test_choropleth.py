@@ -49,3 +49,20 @@ def test_build_resilience_map_raises_on_unmapped_country():
         assert "Atlantis" in str(e)
     else:
         raise AssertionError("expected build_resilience_map to raise ValueError for an unmapped country")
+
+
+def test_live_frame_filters_sorts_and_reports_missing():
+    sys_path = str(PROJECT_ROOT)
+    import sys
+    sys.path.insert(0, sys_path)
+    import live_risk
+
+    payload = {"ranked": [
+        {"iso3": "CHE", "structural_score": 80.0, "exposure_km": 3000, "nuclear_armed": False, "completeness": 1.0},
+        {"iso3": "NZL", "structural_score": 90.5, "exposure_km": 18000, "nuclear_armed": False, "completeness": 0.9},
+        {"iso3": "XXX", "structural_score": 99.0},
+    ]}
+    frame, missing = live_risk.to_frame(payload, {"CHE": "Switzerland", "NZL": "New Zealand", "ISL": "Iceland"})
+    assert list(frame["Country"]) == ["New Zealand", "Switzerland"]
+    assert missing == ["Iceland"]
+    assert set(live_risk.SCENARIO_SLUGS) == {"1", "2", "3", "4", "5", "6"}

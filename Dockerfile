@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir --upgrade pip
 COPY --chown=user requirements.txt ./
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-COPY --chown=user risk_simulator_app.py ./
+COPY --chown=user risk_simulator_app.py live_risk.py seo_patch.py ./
 COPY --chown=user data ./data
 COPY --chown=user .streamlit ./.streamlit
 

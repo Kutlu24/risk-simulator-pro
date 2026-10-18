@@ -210,6 +210,8 @@ st.set_page_config(page_title="Global Risk Simulator: Country Resilience Ranking
 # overridable by env so a staging deployment can point elsewhere.
 import os
 
+import live_risk
+
 _NETWORK = {
     "hub": os.environ.get("RS_HUB_URL", "https://global-monitor-render-relay.onrender.com/hub/"),
     "gm": os.environ.get("RS_GM_URL", "https://global-monitor-render-relay.onrender.com/"),
@@ -229,6 +231,23 @@ with st.sidebar:
         f"[Worldora news]({_NETWORK['worldora']})  \n"
         f"[Worldora Intelligence]({_NETWORK['intel']})"
     )
+
+with st.sidebar:
+    st.markdown("### Data source")
+    data_source = st.radio(
+        "Scores come from",
+        ["Illustrative (hand-scored, 11 criteria)", "Live data (World Bank, via Global Monitor)"],
+        key="data_source",
+        help="Illustrative: 19 countries scored 0-10 by hand. Live: six structural criteria computed from "
+             "World Bank indicators by Global Monitor, plus distance to the scenario's epicentre.",
+    )
+LIVE_MODE = data_source.startswith("Live")
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _live_payload(base_url: str, scenario_id: str) -> dict:
+    return live_risk.fetch(base_url, scenario_id)
+
 
 # Real typography beyond what config.toml's theme.font (sans serif/serif/
 # monospace only) can express - a serif display face for headings (analyst-
@@ -306,6 +325,23 @@ with st.container(border=True, key="scenario_picker"):
 # Run the calculation for the selected scenario
 selected_id = scenario_name_to_id[selected_scenario_name]
 result_df, scenario_name = calculate_scores(df.copy(), selected_id)
+live_missing: list[str] = []
+if LIVE_MODE:
+    try:
+        live_df, live_missing = live_risk.to_frame(
+            _live_payload(_NETWORK["gm"], selected_id), {iso: name for name, iso in COUNTRY_ISO3.items()})
+        if live_df.empty:
+            raise ValueError("live data returned none of the 19 countries")
+        result_df = live_df
+    except Exception as exc:  # network or schema problem: keep the page working on the hand-scored data
+        LIVE_MODE = False
+        st.warning(f"Live data is unavailable right now ({type(exc).__name__}); showing the illustrative scores instead.")
+if LIVE_MODE:
+    st.info("**Live data.** Six structural criteria (economy, social stability, infrastructure, climate, energy, "
+            "demography) computed from World Bank indicators by Global Monitor, scored 0-100 as a *relative* standing. "
+            "Distance to the scenario's epicentre is a separate column, never mixed into the score. Nuclear posture, "
+            "neutrality, preparedness and cybersecurity are not scored here because no public data source exists for them."
+            + (f" Not ranked in the live data: {', '.join(live_missing)}." if live_missing else ""))
 
 # Show the results
 st.header(f"📊 Scenario Results: {scenario_name}")
@@ -322,14 +358,18 @@ with col1:
     rows_html = []
     for rank, row in result_df.iterrows():
         label, color, bg = tier_for_rank(rank, n_countries)
+        km = ""
+        if LIVE_MODE:
+            km_val = row.get('Exposure (km)')
+            km = f"<td>{km_val:,.0f}</td>" if pd.notna(km_val) else "<td>-</td>"
         rows_html.append(
             f"<tr><td>{rank + 1}</td><td>{row['Country']}</td>"
-            f"<td>{row['Weighted Score']:.2f}</td>"
+            f"<td>{row['Weighted Score']:.2f}</td>{km}"
             f"<td><span class='tier-badge' style='color:{color};background:{bg};'>{label}</span></td></tr>"
         )
     table_html = (
         "<table class='risk-table'><thead><tr>"
-        "<th>#</th><th>Country</th><th>Score</th><th>Tier</th>"
+        "<th>#</th><th>Country</th><th>Score</th>" + ("<th>Epicentre km</th>" if LIVE_MODE else "") + "<th>Tier</th>"
         "</tr></thead><tbody>" + "".join(rows_html) + "</tbody></table>"
     )
     st.markdown(table_html, unsafe_allow_html=True)
