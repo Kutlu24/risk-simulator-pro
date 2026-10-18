@@ -12,7 +12,7 @@ services:
     # a local browser (would hang the process on Render), --browser.gatherUsageStats
     # false to skip Streamlit's telemetry prompt (would otherwise block on
     # a stdin read that never comes on Render's non-interactive shell).
-    startCommand: streamlit run risk_simulator_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    startCommand: python seo_patch.py && streamlit run risk_simulator_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.6

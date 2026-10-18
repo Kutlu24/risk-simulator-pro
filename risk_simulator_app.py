@@ -204,7 +204,7 @@ def build_resilience_map(result_df: pd.DataFrame, mobile: bool = False) -> foliu
 
 # 4. STREAMLIT UI
 #---------------------------------------------------
-st.set_page_config(page_title="Global Risk Simulator", layout="wide")
+st.set_page_config(page_title="Global Risk Simulator: Country Resilience Ranking", layout="wide")
 
 # Cross-links to the sibling sites in the Global Monitor network. All
 # overridable by env so a staging deployment can point elsewhere.

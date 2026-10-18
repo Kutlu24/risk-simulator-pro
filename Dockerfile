@@ -27,4 +27,4 @@ EXPOSE 8501
 # reachable from inside its own container, --server.headless/
 # --browser.gatherUsageStats so it doesn't hang waiting on a browser launch
 # or a telemetry stdin prompt that never comes in a container either.
-CMD ["sh", "-c", "streamlit run risk_simulator_app.py --server.port ${PORT:-8501} --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false"]
+CMD ["sh", "-c", "python seo_patch.py && streamlit run risk_simulator_app.py --server.port ${PORT:-8501} --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false"]
